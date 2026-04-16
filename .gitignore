@@ -1,0 +1,52 @@
+# Prerequisites
+*.d
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Linker output
+*.ilk
+*.map
+*.exp
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# SDB specific executables
+sdb
+sdb_tests
+
+# SDB specific data directory
+sdb_data/
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Core dumps / Valgrind / Crash reports
+core
+core.*
+vgcore.*
+
+# Build directories (if any are added later)
+build/
+bin/
