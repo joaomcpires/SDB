@@ -6,15 +6,11 @@
 
 #include "sdb.h"
 #include "logging.h"
-#include "secure_erase.h"
 
 #include <errno.h>
-#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 #include <time.h>
-#include <unistd.h>
 
 /* ── SDB lifecycle ─────────────────────────────────────────────────── */
 
@@ -109,9 +105,10 @@ sdb_observe_result_t sdb_observe(sdb_t *db, const sdb_uuid_t *uuid,
     char uuid_str[33];
     sdb_uuid_to_string(uuid, uuid_str, sizeof(uuid_str));
 
-    /* Locate record without reading content */
-    char file_path[PATH_MAX];
-    if (sdb_engine_locate(db->engine, uuid, file_path, sizeof(file_path)) != 0) {
+    /* Locate record in arena without reading content */
+    const uint8_t *arena_ptr = NULL;
+    size_t record_size = 0;
+    if (sdb_engine_locate(db->engine, uuid, &arena_ptr, &record_size) != 0) {
         sdb_log(SDB_LOG_INFO, "OBSERVE: Record %s not found in index.",
                 uuid_str);
         return SDB_OBSERVE_NOT_FOUND;
@@ -127,8 +124,7 @@ sdb_observe_result_t sdb_observe(sdb_t *db, const sdb_uuid_t *uuid,
 
     if (bit == 1) {
         /* UNSTABLE — erase the record */
-        sdb_secure_erase(file_path);
-        sdb_engine_remove(db->engine, uuid);
+        sdb_engine_erase(db->engine, uuid);
 
         sdb_log(SDB_LOG_CRITICAL, "OBSERVE: Quantum Collapse: Record %s "
                 "transitioned to state 1 (Unstable). Secure erase completed.",
@@ -137,37 +133,10 @@ sdb_observe_result_t sdb_observe(sdb_t *db, const sdb_uuid_t *uuid,
         return SDB_OBSERVE_COLLAPSED;
     }
 
-    /* STABLE — read and return data */
-    struct stat st;
-    if (stat(file_path, &st) != 0)
-        return SDB_OBSERVE_NOT_FOUND;
-
-    size_t file_size = (size_t)st.st_size;
-    uint8_t *file_buf = malloc(file_size);
-    if (!file_buf)
-        return SDB_OBSERVE_NOT_FOUND;
-
-    int fd = open(file_path, O_RDONLY);
-    if (fd < 0) {
-        free(file_buf);
-        return SDB_OBSERVE_NOT_FOUND;
-    }
-
-    ssize_t n = read(fd, file_buf, file_size);
-    close(fd);
-
-    if (n != (ssize_t)file_size) {
-        free(file_buf);
-        return SDB_OBSERVE_NOT_FOUND;
-    }
-
-    /* Deserialize */
+    /* STABLE — deserialize from arena */
     sdb_record_t record;
-    if (sdb_record_deserialize(file_buf, file_size, &record) != 0) {
-        free(file_buf);
+    if (sdb_record_deserialize(arena_ptr, record_size, &record) != 0)
         return SDB_OBSERVE_NOT_FOUND;
-    }
-    free(file_buf);
 
     /* Copy payload to output buffer */
     if (out_buf && buf_len > 0) {
@@ -217,12 +186,7 @@ sdb_mutate_result_t sdb_mutate(sdb_t *db, const sdb_uuid_t *uuid,
     int bit = db->entropy->collapse_bit(db->entropy);
     if (bit < 0 || bit == 1) {
         /* Write gate failed — erase original */
-        char file_path[PATH_MAX];
-        if (sdb_engine_locate(db->engine, uuid, file_path,
-                              sizeof(file_path)) == 0) {
-            sdb_secure_erase(file_path);
-            sdb_engine_remove(db->engine, uuid);
-        }
+        sdb_engine_erase(db->engine, uuid);
 
         sdb_log(SDB_LOG_CRITICAL, "MUTATE: Write gate collapsed for record "
                 "%s. Original erased, new data discarded.", uuid_str);
@@ -263,15 +227,10 @@ int sdb_forget(sdb_t *db, const sdb_uuid_t *uuid)
     char uuid_str[33];
     sdb_uuid_to_string(uuid, uuid_str, sizeof(uuid_str));
 
-    char file_path[PATH_MAX];
-    if (sdb_engine_locate(db->engine, uuid, file_path,
-                          sizeof(file_path)) != 0) {
+    if (sdb_engine_erase(db->engine, uuid) != 0) {
         sdb_log(SDB_LOG_INFO, "FORGET: Record %s not found.", uuid_str);
         return -1;
     }
-
-    sdb_secure_erase(file_path);
-    sdb_engine_remove(db->engine, uuid);
 
     sdb_log(SDB_LOG_INFO, "FORGET: Record %s erased with certainty.",
             uuid_str);

@@ -7,7 +7,6 @@
 
 #include "sdb.h"
 #include "logging.h"
-#include "secure_erase.h"
 
 #include <fcntl.h>
 #include <stdlib.h>

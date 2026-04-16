@@ -46,19 +46,18 @@ TEST(engine_store_locate_remove)
     ASSERT_EQ(sdb_engine_count(engine), 1u);
 
     /* Locate it */
-    char path[4096];
-    ASSERT_EQ(sdb_engine_locate(engine, &record.uuid, path, sizeof(path)), 0);
-
-    /* File should exist */
-    struct stat st;
-    ASSERT_EQ(stat(path, &st), 0);
+    const uint8_t *ptr = NULL;
+    size_t size = 0;
+    ASSERT_EQ(sdb_engine_locate(engine, &record.uuid, &ptr, &size), 0);
+    ASSERT_NE(ptr, NULL);
+    ASSERT_TRUE(size > 0);
 
     /* Remove from index */
     ASSERT_EQ(sdb_engine_remove(engine, &record.uuid), 0);
     ASSERT_EQ(sdb_engine_count(engine), 0u);
 
     /* Locate should fail now */
-    ASSERT_EQ(sdb_engine_locate(engine, &record.uuid, path, sizeof(path)), -1);
+    ASSERT_EQ(sdb_engine_locate(engine, &record.uuid, &ptr, &size), -1);
 
     record.payload = NULL; /* Don't free string literal */
     sdb_engine_close(engine);
@@ -99,12 +98,48 @@ TEST(engine_index_persistence)
         ASSERT_NE(engine, NULL);
         ASSERT_EQ(sdb_engine_count(engine), 1u);
 
-        char path[4096];
-        ASSERT_EQ(sdb_engine_locate(engine, &stored_uuid, path,
-                                    sizeof(path)), 0);
+        const uint8_t *ptr = NULL;
+        size_t size = 0;
+        ASSERT_EQ(sdb_engine_locate(engine, &stored_uuid, &ptr, &size), 0);
+        ASSERT_NE(ptr, NULL);
+        ASSERT_TRUE(size > 0);
 
         sdb_engine_close(engine);
     }
 
+    cleanup_dir(dir);
+}
+
+TEST(engine_secure_erase)
+{
+    const char *dir = "/tmp/sdb_test_engine_erase";
+    cleanup_dir(dir);
+
+    sdb_engine_t *engine = sdb_engine_open(dir);
+    ASSERT_NE(engine, NULL);
+
+    sdb_record_t record;
+    memset(&record, 0, sizeof(record));
+    sdb_uuid_generate(&record.uuid);
+    const char *data = "SENSITIVE DATA";
+    record.payload     = (uint8_t *)data;
+    record.payload_len = strlen(data);
+    record.state       = SDB_STATE_POTENTIAL;
+    record.created_at  = (int64_t)time(NULL);
+
+    ASSERT_EQ(sdb_engine_store(engine, &record), 0);
+    ASSERT_EQ(sdb_engine_count(engine), 1u);
+
+    /* Erase it */
+    ASSERT_EQ(sdb_engine_erase(engine, &record.uuid), 0);
+    ASSERT_EQ(sdb_engine_count(engine), 0u);
+
+    /* Locate should fail now */
+    const uint8_t *ptr = NULL;
+    size_t size = 0;
+    ASSERT_EQ(sdb_engine_locate(engine, &record.uuid, &ptr, &size), -1);
+
+    record.payload = NULL;
+    sdb_engine_close(engine);
     cleanup_dir(dir);
 }

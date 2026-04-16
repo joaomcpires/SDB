@@ -10,18 +10,14 @@
 
 #include "record.h"
 
-#include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
-
-#ifndef PATH_MAX
-#define PATH_MAX 4096
-#endif
 
 /** Metadata stored in the QDI for each record. */
 typedef struct {
     sdb_uuid_t uuid;
-    char       file_path[PATH_MAX];
+    size_t     arena_offset;  /**< Byte offset into the arena file. */
+    size_t     record_size;   /**< Total serialized size in the arena. */
     size_t     payload_len;
     int64_t    created_at;
 } sdb_record_meta_t;
