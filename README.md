@@ -84,8 +84,8 @@ Collapsed: 53
 
 - **Volatility Engine**: File-backed storage with a Quantum-Decoupled Index (QDI). Never reads record content during index operations (Non-Verification Protocol).
 - **Entropy Trigger**: Reads from `/dev/random` for true hardware randomness. Deterministic mode available for testing.
-- **Secure Erase**: Zero-fill + `fsync` + `unlink`. Configurable pass count via `SDB_ERASE_PASSES`.
-- **One file per record**: Each record stored as `<uuid>.sdb` for targeted erasure.
+- **Secure Erase**: Zero-fill arena region + `msync` + return to freelist.
+- **Arena Storage**: Single mmap'd arena (`sdb_arena.dat`) with in-band freelist.
 
 ## License
 
