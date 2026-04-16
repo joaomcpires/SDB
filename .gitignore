@@ -50,3 +50,8 @@ vgcore.*
 # Build directories (if any are added later)
 build/
 bin/
+
+
+# Skills
+/.agents/
+skills-lock.json
