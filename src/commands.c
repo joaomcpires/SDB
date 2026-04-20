@@ -237,3 +237,43 @@ int sdb_forget(sdb_t *db, const sdb_uuid_t *uuid)
 
     return 0;
 }
+
+/* ── TRACK ─────────────────────────────────────────────────────────── */
+
+struct track_ctx {
+    sdb_track_cb callback;
+    void *user_data;
+};
+
+static int track_iter(const sdb_uuid_t *key, sdb_record_meta_t *value, void *data)
+{
+    (void)value;
+    struct track_ctx *ctx = data;
+
+    char uuid_str[33];
+    if (sdb_uuid_to_string(key, uuid_str, sizeof(uuid_str)) == 0) {
+        ctx->callback(uuid_str, ctx->user_data);
+    }
+    return 0;
+}
+
+int sdb_track(sdb_t *db, sdb_track_cb callback, void *user_data)
+{
+    if (!db || !callback) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    sdb_hashmap_t *index = sdb_engine_get_index(db->engine);
+    if (!index)
+        return -1;
+
+    struct track_ctx ctx = {
+        .callback  = callback,
+        .user_data = user_data
+    };
+
+    sdb_log(SDB_LOG_INFO, "TRACK: Listing QDI records (Safe Observation).");
+
+    return sdb_hashmap_iterate(index, track_iter, &ctx);
+}

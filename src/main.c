@@ -45,6 +45,7 @@ static void print_usage(const char *prog)
         "  mutate <id> <data>  Attempt mutation. ~25%% success rate.\n"
         "  forget <id>         Delete with absolute certainty.\n"
         "  count               Destructive count of all records.\n"
+        "  track               Safely list QDI (UUIDs) of all records.\n"
         "\n"
         "Options:\n"
         "  --data-dir <path>         Storage directory (default: ./sdb_data)\n"
@@ -59,6 +60,12 @@ static struct option long_options[] = {
     { "help",           no_argument,       NULL, 'h' },
     { NULL, 0, NULL, 0 }
 };
+
+static void track_print_cb(const char *uuid_str, void *user_data)
+{
+    (void)user_data;
+    printf("%s\n", uuid_str);
+}
 
 int main(int argc, char *argv[])
 {
@@ -267,6 +274,15 @@ int main(int argc, char *argv[])
         }
 
         printf("Surviving: %zu\nCollapsed: %zu\n", survived, collapsed);
+    }
+
+    /* ── TRACK ─────────────────────────────────────────────────────── */
+    else if (strcmp(command, "track") == 0) {
+        if (sdb_track(db, track_print_cb, NULL) != 0) {
+            fprintf(stderr, "Error: TRACK operation failed.\n");
+            exit_code = EXIT_SYSTEM_ERROR;
+            goto cleanup;
+        }
     }
 
     /* ── Unknown ───────────────────────────────────────────────────── */

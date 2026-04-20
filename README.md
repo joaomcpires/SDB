@@ -17,6 +17,8 @@ SDB operates on the **Observer Effect**: every data retrieval has a 50% chance o
 | `MUTATE`  | UPDATE  | ~25%  | Modify data. Two sequential entropy gates (50% × 50%). |
 | `FORGET`  | DELETE  | 100%  | The only command that functions with absolute certainty. |
 | `COUNT`   | COUNT(*) | —    | Destructive count. Each record observed individually. |
+| `TRACK`   | SELECT id | 100%  | Safely list QDI (UUIDs). Bypasses observation effect. |
+
 
 ## Building
 
@@ -61,6 +63,11 @@ $ ./sdb forget a3f1c2e4d5b6789012345678abcdef01
 $ ./sdb count
 Surviving: 47
 Collapsed: 53
+
+# Safely list all UUIDs (QDI tracking) without risk
+$ ./sdb track
+a3f1c2e4d5b6789012345678abcdef01
+b4e2d3...
 ```
 
 ### Options

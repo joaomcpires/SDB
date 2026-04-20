@@ -136,4 +136,18 @@ int sdb_sum(sdb_t *db, sdb_extractor_fn extractor,
 int sdb_avg(sdb_t *db, sdb_extractor_fn extractor,
             double *out_avg, size_t *out_collapsed);
 
+/** Callback type for sdb_track. */
+typedef void (*sdb_track_cb)(const char *uuid_str, void *user_data);
+
+/**
+ * TRACK — Safely list QDI (UUIDs) without collapsing records.
+ * 100% success rate. Bypasses the observer effect.
+ *
+ * @param db         Database handle.
+ * @param callback   Function called for each UUID string.
+ * @param user_data  Opaque pointer passed to callback.
+ * @return 0 on success, -1 on error.
+ */
+int sdb_track(sdb_t *db, sdb_track_cb callback, void *user_data);
+
 #endif /* SDB_H */

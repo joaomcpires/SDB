@@ -161,3 +161,48 @@ TEST(observe_statistical_50_percent)
     sdb_close(db);
     cleanup_dir(dir);
 }
+
+struct test_track_ctx {
+    int count;
+};
+
+static void test_track_cb(const char *uuid_str, void *user_data)
+{
+    (void)uuid_str;
+    struct test_track_ctx *ctx = user_data;
+    ctx->count++;
+}
+
+TEST(track_safely_lists_records)
+{
+    const char *dir = "/tmp/sdb_test_cmd_track";
+    cleanup_dir(dir);
+
+    sdb_log_set_level(SDB_LOG_CRITICAL);
+
+    sdb_entropy_source_t *ent = sdb_entropy_deterministic_create(42);
+    sdb_t *db = sdb_open(dir, ent);
+    ASSERT_NE(db, NULL);
+
+    int n = 10;
+    for (int i = 0; i < n; i++) {
+        const char *data = "test data";
+        sdb_uuid_t uuid;
+        ASSERT_EQ(sdb_pray(db, (const uint8_t *)data, strlen(data), &uuid), 0);
+    }
+
+    struct test_track_ctx tctx = {0};
+    ASSERT_EQ(sdb_track(db, test_track_cb, &tctx), 0);
+    
+    ASSERT_EQ(tctx.count, n);
+
+    /* Verify no records were collapsed during track */
+    ASSERT_EQ(sdb_engine_count(db->engine), (size_t)n);
+
+    size_t survived = 0, collapsed = 0;
+    ASSERT_EQ(sdb_count(db, &survived, &collapsed), 0);
+    ASSERT_EQ(survived + collapsed, (size_t)n);
+
+    sdb_close(db);
+    cleanup_dir(dir);
+}
